@@ -1,0 +1,8 @@
+{
+  "name": "Zenith AI Task Manager",
+  "description": "High-performance, AI-assisted productivity dashboard with intelligent task suggestions and multi-modal biometric security.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

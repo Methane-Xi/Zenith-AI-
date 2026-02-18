@@ -6,8 +6,8 @@ import { getAnalytics } from "firebase/analytics";
 /**
  * Zenith AI - Firebase Production Configuration
  * 
- * INTEGRATION NOTE: To fix 'auth/unauthorized-domain', you MUST add
- * the hostname displayed in the console to:
+ * INTEGRATION NOTE: If you encounter 'auth/unauthorized-domain', 
+ * you MUST add the hostname displayed in the console to:
  * Firebase Console > Authentication > Settings > Authorized Domains
  */
 const firebaseConfig = {
@@ -21,18 +21,18 @@ const firebaseConfig = {
   measurementId: "G-KBG9G8VNDW"
 };
 
-// Initialize Firebase
+// Initialize Firebase Core
 const app = initializeApp(firebaseConfig);
 
-// Initialize Services
+// Export Services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-// Initialize Provider
+// Configure Auth Provider
 export const googleProvider = new GoogleAuthProvider();
 
-// FIX: Forces account selection (fixes sticky login bugs)
+// ARCHITECTURE GOVERNANCE: Force account selection (fixes sticky login and hardcoded email bugs)
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });

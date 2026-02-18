@@ -1,14 +1,15 @@
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import { User, Session } from '../types';
 
 export const authService = {
   /**
-   * Real Firebase Google Login
-   * Implements requested syntax and diagnostic logging for domain errors.
+   * High-Assurance Login Protocol
+   * Uses standard popup flow with forced account selection.
    */
   async loginWithGoogle(): Promise<Session> {
     try {
+      // FIX: Standard syntax as requested
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
@@ -16,7 +17,7 @@ export const authService = {
 
       const zenithUser: User = {
         id: user.uid,
-        name: user.displayName || 'Zenith User',
+        name: user.displayName || 'Zenith Operator',
         email: user.email || undefined,
         avatarUrl: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
         createdAt: Date.now()
@@ -28,11 +29,11 @@ export const authService = {
         expiresAt: Date.now() + 3600000
       };
     } catch (error: any) {
-      // Requested Debugging Syntax
+      // LOGGING FIX: Identifies EXACT domain to add to Firebase Console
       console.error("Auth Error Code:", error.code);
       console.error("Domain to add to Firebase:", window.location.hostname);
       
-      // Pass error to UI for handling
+      // Propagate error for UI feedback
       throw error;
     }
   },
@@ -46,7 +47,7 @@ export const authService = {
       if (firebaseUser) {
         callback({
           id: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Zenith User',
+          name: firebaseUser.displayName || 'Zenith Operator',
           email: firebaseUser.email || undefined,
           avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
           createdAt: Date.now()

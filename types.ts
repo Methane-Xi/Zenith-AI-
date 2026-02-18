@@ -1,4 +1,3 @@
-
 export enum TaskStatus {
   TODO = 'TODO',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -14,6 +13,7 @@ export enum AcquisitionState {
   HARDWARE_READY = 'HARDWARE_READY',
   DATA_STREAMING = 'DATA_STREAMING',
   FEATURE_EXTRACTION = 'FEATURE_EXTRACTION',
+  LIVENESS_VERIFIED = 'LIVENESS_VERIFIED',
   SUCCESS = 'SUCCESS',
   ERROR = 'ERROR'
 }
@@ -104,11 +104,4 @@ export interface Task {
   suggestions: AISuggestion[];
   createdAt: number;
   updatedAt: number;
-  duration?: string;
-  actualDuration?: string; // ML Feature: Track actual time taken vs estimate
-  energyLevel?: number;   // ML Feature: Cognitive load required (1-10)
-  category?: string;
-  deadline?: string;
-}
-
-export type ActivePanel = 'dashboard' | 'calendar' | 'notifications' | 'settings';
+  

@@ -28,7 +28,7 @@ export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : nul
 // Configure Provider
 export const googleProvider = new GoogleAuthProvider();
 
-// FIX: Forces account selection (fixes hardcoded email bug and sticky sessions)
+// ARCHITECTURE GOVERNANCE: Force account selection (fixes sticky login issues)
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });

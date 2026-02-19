@@ -1,5 +1,13 @@
-
-import { collection, query, where, getDocs, setDoc, doc, deleteDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { 
+  collection, 
+  query, 
+  where, 
+  setDoc, 
+  doc, 
+  deleteDoc, 
+  updateDoc, 
+  onSnapshot 
+} from "firebase/firestore";
 import { db } from "./firebase";
 import { Task } from '../types';
 
@@ -14,7 +22,7 @@ export const taskDb = {
       querySnapshot.forEach((doc) => {
         tasks.push(doc.data() as Task);
       });
-      // Sort locally by creation date (Firestore could also do this)
+      // Sort locally by creation date
       callback(tasks.sort((a, b) => b.createdAt - a.createdAt));
     });
   },

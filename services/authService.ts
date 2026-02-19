@@ -1,38 +1,68 @@
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  ConfirmationResult,
+  updateProfile
+} from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import { User, Session } from '../types';
 
 export const authService = {
   /**
-   * Real Firebase Google Login
-   * Uses specific syntax requested to debug unauthorized domain issues.
+   * Google Login/Sign-up
    */
   async loginWithGoogle(): Promise<Session> {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      console.log("Logged in as:", result.user.email);
-
-      const zenithUser: User = {
-        id: result.user.uid,
-        name: result.user.displayName || 'Zenith Operator',
-        email: result.user.email || undefined,
-        avatarUrl: result.user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${result.user.uid}`,
-        createdAt: Date.now()
-      };
-
-      return {
-        user: zenithUser,
-        token: "firebase_session_active",
-        expiresAt: Date.now() + 3600000
-      };
+      return this._mapFirebaseUserToSession(result.user);
     } catch (error: any) {
-      // FIX: Specific debug logs requested
-      console.error("Auth Error Code:", error.code);
-      console.error("Domain to add to Firebase:", window.location.hostname);
-      
-      // Propagate for UI handling
+      console.error("Auth Error:", error.code);
       throw error;
     }
+  },
+
+  /**
+   * Email/Password Sign-up
+   */
+  async signUpWithEmail(email: string, pass: string, name: string): Promise<Session> {
+    const result = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(result.user, { displayName: name });
+    return this._mapFirebaseUserToSession(result.user);
+  },
+
+  /**
+   * Email/Password Login
+   */
+  async loginWithEmail(email: string, pass: string): Promise<Session> {
+    const result = await signInWithEmailAndPassword(auth, email, pass);
+    return this._mapFirebaseUserToSession(result.user);
+  },
+
+  /**
+   * Phone Number Authentication
+   */
+  setupRecaptcha(containerId: string) {
+    if ((window as any).recaptchaVerifier) return;
+    (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+      size: 'invisible'
+    });
+  },
+
+  async sendOtp(phone: string): Promise<ConfirmationResult> {
+    const verifier = (window as any).recaptchaVerifier;
+    return await signInWithPhoneNumber(auth, phone, verifier);
+  },
+
+  async verifyOtp(confirmation: ConfirmationResult, code: string): Promise<Session> {
+    const result = await confirmation.confirm(code);
+    return this._mapFirebaseUserToSession(result.user);
   },
 
   async logout(): Promise<void> {
@@ -42,16 +72,29 @@ export const authService = {
   onAuthChange(callback: (user: User | null) => void) {
     return onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        callback({
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Zenith Operator',
-          email: firebaseUser.email || undefined,
-          avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
-          createdAt: Date.now()
-        });
+        callback(this._mapFirebaseUser(firebaseUser));
       } else {
         callback(null);
       }
     });
+  },
+
+  _mapFirebaseUser(firebaseUser: any): User {
+    return {
+      id: firebaseUser.uid,
+      name: firebaseUser.displayName || 'Zenith Operator',
+      email: firebaseUser.email || undefined,
+      phone: firebaseUser.phoneNumber || undefined,
+      avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
+      createdAt: Date.now()
+    };
+  },
+
+  _mapFirebaseUserToSession(firebaseUser: any): Session {
+    return {
+      user: this._mapFirebaseUser(firebaseUser),
+      token: "firebase_session_active",
+      expiresAt: Date.now() + 3600000
+    };
   }
 };

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { Task, TaskStatus, AISuggestion, Note, User, ActivePanel, UserSettings } from './types';
 import { getTaskSuggestions, decomposeProject, generateStrategicBriefing, performTaskResearch, extractTaskDetails } from './services/geminiService';
@@ -13,6 +12,10 @@ interface TaskContextType {
   activePanel: ActivePanel;
   setActivePanel: (panel: ActivePanel) => void;
   login: () => Promise<void>;
+  signUpEmail: (email: string, pass: string, name: string) => Promise<void>;
+  loginEmail: (email: string, pass: string) => Promise<void>;
+  sendOtp: (phone: string) => Promise<any>;
+  verifyOtp: (confirmation: any, code: string) => Promise<void>;
   logout: () => void;
   addTask: (title: string, details?: Partial<Task>) => Promise<string>;
   explodeProject: (goal: string) => Promise<void>;
@@ -66,7 +69,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
-  // Sync Auth State
   useEffect(() => {
     const unsubscribe = authService.onAuthChange((u) => {
       setUser(u);
@@ -75,17 +77,17 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  // Sync Tasks from Firestore
   useEffect(() => {
     if (user) {
       const unsubscribe = taskDb.subscribeToTasks(user.id, (syncedTasks) => {
         setTasks(syncedTasks);
       });
       return () => unsubscribe();
+    } else {
+      setTasks([]);
     }
   }, [user]);
 
-  // Update Strategic Briefing
   useEffect(() => {
     if (user && tasks.length > 0) {
       setIsBriefingLoading(true);
@@ -222,6 +224,22 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await authService.loginWithGoogle();
   };
 
+  const signUpEmail = async (email: string, pass: string, name: string) => {
+    await authService.signUpWithEmail(email, pass, name);
+  };
+
+  const loginEmail = async (email: string, pass: string) => {
+    await authService.loginWithEmail(email, pass);
+  };
+
+  const sendOtp = async (phone: string) => {
+    return await authService.sendOtp(phone);
+  };
+
+  const verifyOtp = async (confirmation: any, code: string) => {
+    await authService.verifyOtp(confirmation, code);
+  };
+
   const logout = async () => {
     await authService.logout();
     setSelectedTaskId(null);
@@ -241,7 +259,8 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return React.createElement(TaskContext.Provider, { 
     value: { 
-      user, tasks, briefing, isBriefingLoading, isLoading, activePanel, setActivePanel, login, logout, 
+      user, tasks, briefing, isBriefingLoading, isLoading, activePanel, setActivePanel, login, 
+      signUpEmail, loginEmail, sendOtp, verifyOtp, logout, 
       addTask, explodeProject, deepResearch, updateTask, deleteTask, addNote, toggleSubtask, handleSuggestion, 
       selectedTaskId, setSelectedTaskId, isTaskModalOpen, setIsTaskModalOpen, settings, updateSettings, recalculateAllPriorities
     } 

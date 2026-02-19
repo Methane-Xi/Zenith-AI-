@@ -1,3 +1,4 @@
+
 export enum TaskStatus {
   TODO = 'TODO',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -91,6 +92,7 @@ export interface Reminder {
   message: string;
 }
 
+// Added missing properties to the Task interface to support AI features, detailed orchestration, and UI rendering
 export interface Task {
   id: string;
   userId: string;
@@ -104,4 +106,11 @@ export interface Task {
   suggestions: AISuggestion[];
   createdAt: number;
   updatedAt: number;
-  
+  category?: string;
+  duration?: string;
+  deadline?: string;
+  energyLevel?: number;
+}
+
+// Added missing ActivePanel type definition used for global application navigation state
+export type ActivePanel = 'dashboard' | 'calendar' | 'notifications' | 'settings';

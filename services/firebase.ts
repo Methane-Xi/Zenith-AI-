@@ -4,11 +4,7 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
 /**
- * Zenith AI - Firebase Production Configuration
- * 
- * INTEGRATION NOTE: If you encounter 'auth/unauthorized-domain', 
- * you MUST add the hostname displayed in the console to:
- * Firebase Console > Authentication > Settings > Authorized Domains
+ * Zenith AI - Firebase Global Configuration
  */
 const firebaseConfig = {
   apiKey: "AIzaSyCEoiFB1xvpCMnfrr0SNY-G_uAkTsmpXX8",
@@ -24,15 +20,15 @@ const firebaseConfig = {
 // Initialize Firebase Core
 const app = initializeApp(firebaseConfig);
 
-// Export Services
+// Initialize Services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-// Configure Auth Provider
+// Configure Provider
 export const googleProvider = new GoogleAuthProvider();
 
-// ARCHITECTURE GOVERNANCE: Force account selection (fixes sticky login and hardcoded email bugs)
+// FIX: Forces account selection (fixes hardcoded email bug and sticky sessions)
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });

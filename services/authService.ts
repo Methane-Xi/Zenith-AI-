@@ -4,22 +4,19 @@ import { User, Session } from '../types';
 
 export const authService = {
   /**
-   * High-Assurance Login Protocol
-   * Uses standard popup flow with forced account selection.
+   * Real Firebase Google Login
+   * Uses specific syntax requested to debug unauthorized domain issues.
    */
   async loginWithGoogle(): Promise<Session> {
     try {
-      // FIX: Standard syntax as requested
       const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      console.log("Logged in as:", user.email);
+      console.log("Logged in as:", result.user.email);
 
       const zenithUser: User = {
-        id: user.uid,
-        name: user.displayName || 'Zenith Operator',
-        email: user.email || undefined,
-        avatarUrl: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
+        id: result.user.uid,
+        name: result.user.displayName || 'Zenith Operator',
+        email: result.user.email || undefined,
+        avatarUrl: result.user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${result.user.uid}`,
         createdAt: Date.now()
       };
 
@@ -29,11 +26,11 @@ export const authService = {
         expiresAt: Date.now() + 3600000
       };
     } catch (error: any) {
-      // LOGGING FIX: Identifies EXACT domain to add to Firebase Console
+      // FIX: Specific debug logs requested
       console.error("Auth Error Code:", error.code);
       console.error("Domain to add to Firebase:", window.location.hostname);
       
-      // Propagate error for UI feedback
+      // Propagate for UI handling
       throw error;
     }
   },

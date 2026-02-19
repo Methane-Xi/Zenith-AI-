@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTaskStore } from '../../store';
 import { 
-  Chrome, Loader2, CheckCircle2, AlertCircle, Sparkles, ExternalLink, ShieldAlert, ShieldCheck
+  Chrome, Loader2, CheckCircle2, Sparkles, ExternalLink, ShieldAlert, ShieldCheck
 } from 'lucide-react';
 
 const AuthScreen: React.FC = () => {
@@ -17,15 +17,14 @@ const AuthScreen: React.FC = () => {
     } catch (err: any) {
       console.error("Login_Catch", err);
       
-      // Target the unauthorized-domain error specifically
       if (err.code === 'auth/unauthorized-domain') {
         setError({
           code: 'auth/unauthorized-domain',
-          message: `UNAUTHORIZED_DOMAIN: Add "${window.location.hostname}" to authorized domains in Firebase Console > Authentication > Settings.`
+          message: `DOMAIN_UNAUTHORIZED: Add "${window.location.hostname}" to authorized domains in Firebase Console.`
         });
       } else {
         setError({
-          message: err.message || "Authentication synchronization failed."
+          message: err.message || "Neural link synchronization failed."
         });
       }
       setIsLoading(false);
@@ -34,15 +33,13 @@ const AuthScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 bg-slate-50 relative overflow-hidden">
-      {/* Tactical Background Elements */}
       <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600 opacity-20"></div>
-      <div className="absolute bottom-0 right-0 w-full h-1 bg-indigo-600 opacity-20"></div>
-
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden relative p-12 transition-all duration-500">
+      
+      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden relative p-12">
         {isLoading && (
           <div className="absolute inset-0 z-50 bg-white/70 backdrop-blur-md flex flex-col items-center justify-center space-y-4">
             <Loader2 className="animate-spin text-indigo-600" size={40} strokeWidth={2.5} />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Syncing Neural Hub</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Authenticating</p>
           </div>
         )}
 
@@ -51,7 +48,7 @@ const AuthScreen: React.FC = () => {
             <ShieldCheck size={36} />
           </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Zenith</h1>
-          <p className="text-slate-500 mt-2 text-sm font-medium">Multi-modal tactical cloud interface.</p>
+          <p className="text-slate-500 mt-2 text-sm font-medium">Connect to the tactical roadmap.</p>
         </div>
 
         {error.message && (
@@ -59,7 +56,7 @@ const AuthScreen: React.FC = () => {
             <div className="flex items-start">
               <ShieldAlert size={18} className="mr-3 mt-0.5 shrink-0" />
               <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-800">Security Access Alert</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-800">Security Alert</p>
                 <span className="text-xs font-bold leading-relaxed">{error.message}</span>
               </div>
             </div>
@@ -68,9 +65,9 @@ const AuthScreen: React.FC = () => {
                 href="https://console.firebase.google.com/" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="mt-2 flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest text-white bg-red-600 px-4 py-2 rounded-xl hover:bg-red-700 transition-colors w-fit shadow-md shadow-red-100 active:scale-95"
+                className="mt-2 flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest text-white bg-red-600 px-4 py-2 rounded-xl hover:bg-red-700 transition-colors w-fit shadow-md shadow-red-100"
               >
-                <span>Manage Authorized Domains</span>
+                <span>Fix in Firebase Console</span>
                 <ExternalLink size={12} />
               </a>
             )}
@@ -83,12 +80,12 @@ const AuthScreen: React.FC = () => {
             className="w-full py-5 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center space-x-4 hover:bg-slate-50 transition-all shadow-sm active:scale-[0.98] group"
           >
             <Chrome size={20} className="text-indigo-600 group-hover:rotate-12 transition-transform" />
-            <span>Connect via Google</span>
+            <span>Sync with Google</span>
           </button>
           
           <div className="text-center">
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-              High-assurance protocol active.<br/>Session duration limited to 12 hours.
+              Domain-verified access only.<br/>Neural seeds rotate every 12h.
             </p>
           </div>
         </div>

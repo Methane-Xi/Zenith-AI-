@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { Task, TaskStatus } from '../types';
-import { CheckCircle, Circle, Clock, MessageSquare, Tag, BrainCircuit } from 'lucide-react';
+import { Task, TaskStatus, TaskPriority } from '../types';
 import { useTaskStore } from '../store';
+import { CheckCircle2, Circle, Clock, Tag, BrainCircuit, AlertTriangle } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
-  const { updateTask, selectedTaskId, setSelectedTaskId } = useTaskStore();
-  const isSelected = selectedTaskId === task.id;
+  const { updateTask, setSelectedTaskId, selectedTaskId } = useTaskStore();
 
   const toggleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -15,72 +15,77 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
     });
   };
 
-  const getPriorityInfo = (val: number) => {
-    if (val > 0.8) return { label: 'Critical', color: 'bg-red-100 text-red-600' };
-    if (val > 0.6) return { label: 'High', color: 'bg-orange-100 text-orange-600' };
-    if (val > 0.3) return { label: 'Medium', color: 'bg-blue-100 text-blue-600' };
-    return { label: 'Low', color: 'bg-slate-100 text-slate-600' };
+  const isSelected = selectedTaskId === task.id;
+
+  const getPriorityColor = (level: TaskPriority) => {
+    switch (level) {
+      case TaskPriority.CRITICAL: return 'text-red-500 bg-red-500/10';
+      case TaskPriority.HIGH: return 'text-orange-500 bg-orange-500/10';
+      case TaskPriority.MEDIUM: return 'text-indigo-500 bg-indigo-500/10';
+      case TaskPriority.LOW: return 'text-slate-500 bg-slate-500/10';
+      default: return 'text-slate-500 bg-slate-500/10';
+    }
   };
 
-  const priority = getPriorityInfo(task.priority);
-  const hasPendingSuggestions = task.suggestions.some(s => s.status === 'pending');
-
   return (
-    <div 
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
       onClick={() => setSelectedTaskId(task.id)}
-      className={`group relative p-4 rounded-xl border transition-all cursor-pointer ${
-        isSelected 
-          ? 'bg-white border-indigo-500 shadow-md ring-1 ring-indigo-500' 
-          : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
-      }`}
+      className={`group relative glass p-5 rounded-[2rem] cursor-pointer transition-all hover:bg-white/5 ${isSelected ? 'ring-2 ring-indigo-500/50 bg-white/5' : ''}`}
     >
-      <div className="flex items-start space-x-3">
+      <div className="flex items-start space-x-4">
         <button 
           onClick={toggleComplete}
-          className={`mt-1 transition-colors ${task.status === TaskStatus.COMPLETED ? 'text-indigo-600' : 'text-slate-300 hover:text-indigo-400'}`}
+          className={`mt-1 transition-colors ${task.status === TaskStatus.COMPLETED ? 'text-emerald-500' : 'text-slate-600 hover:text-indigo-400'}`}
         >
-          {task.status === TaskStatus.COMPLETED ? <CheckCircle size={20} /> : <Circle size={20} />}
+          {task.status === TaskStatus.COMPLETED ? <CheckCircle2 size={22} /> : <Circle size={22} />}
         </button>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <h3 className={`text-sm font-semibold truncate ${task.status === TaskStatus.COMPLETED ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+            <h3 className={`font-bold text-sm truncate ${task.status === TaskStatus.COMPLETED ? 'text-slate-500 line-through' : 'text-white'}`}>
               {task.title}
             </h3>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ml-2 ${priority.color}`}>
-              {priority.label}
-            </span>
+            <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${getPriorityColor(task.priorityLevel)}`}>
+              {task.priorityLevel}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-slate-500 mt-2">
+          {task.aiSummary && (
+            <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed italic">
+              "{task.aiSummary.standardSummary}"
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
             {task.deadline && (
-              <div className="flex items-center space-x-1">
-                <Clock size={12} className="text-slate-400" />
-                <span>{new Date(task.deadline).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              <div className="flex items-center space-x-1 text-[10px] font-bold text-slate-500">
+                <Clock size={12} />
+                <span>{new Date(task.deadline).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
               </div>
             )}
             {task.category && (
-              <div className="flex items-center space-x-1">
-                <Tag size={12} className="text-slate-400" />
+              <div className="flex items-center space-x-1 text-[10px] font-bold text-slate-500">
+                <Tag size={12} />
                 <span>{task.category}</span>
               </div>
             )}
-            {(task.notes.length > 0 || task.subtasks.length > 0) && (
-              <div className="flex items-center space-x-1">
-                <MessageSquare size={12} className="text-slate-400" />
-                <span>{task.notes.length + task.subtasks.length}</span>
+            {task.mlPrediction && task.mlPrediction.riskScore > 70 && (
+              <div className="flex items-center space-x-1 text-[10px] font-bold text-red-400">
+                <AlertTriangle size={12} />
+                <span>High Risk</span>
               </div>
             )}
-            {hasPendingSuggestions && (
-              <div className="flex items-center space-x-1 text-indigo-600 font-medium">
-                <BrainCircuit size={12} className="animate-pulse" />
-                <span>AI</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-1 text-[10px] font-bold text-indigo-400/60">
+              <BrainCircuit size={12} />
+              <span>{task.suggestions.length} Signals</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

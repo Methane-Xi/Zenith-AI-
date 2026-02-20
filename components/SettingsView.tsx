@@ -89,7 +89,7 @@ const InfoCard = ({ icon, title, value }: { icon: React.ReactNode, title: string
 );
 
 const SettingsView: React.FC = () => {
-  const { user, settings, updateSettings, logout } = useTaskStore();
+  const { user, settings, updateSettings, updateAiPreferences, logout } = useTaskStore();
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('profile');
 
   if (!user) return null;
@@ -128,22 +128,20 @@ const SettingsView: React.FC = () => {
 
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-6">
                 <div className="relative group cursor-pointer">
-                  <img src={user.avatarUrl} alt={user.name} className="w-24 h-24 rounded-3xl bg-slate-100 border-2 border-white shadow-lg group-hover:opacity-80 transition-opacity" />
+                  <img src={user.photoURL} alt={user.displayName} className="w-24 h-24 rounded-3xl bg-slate-100 border-2 border-white shadow-lg group-hover:opacity-80 transition-opacity" />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <Activity className="text-white" size={24} />
                   </div>
                 </div>
                 <div className="flex-1 text-center md:text-left">
-                  <h3 className="text-xl font-bold text-slate-900">{user.name}</h3>
-                  <p className="text-sm text-slate-500">{user.email || user.phone || 'No identifier linked'}</p>
+                  <h3 className="text-xl font-bold text-slate-900">{user.displayName}</h3>
+                  <p className="text-sm text-slate-500">{user.email || user.phoneNumber || 'No identifier linked'}</p>
                   <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-3">
-                    <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg uppercase tracking-wider border border-indigo-100">Tier: Enterprise</span>
-                    <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-2.5 py-1 rounded-lg uppercase tracking-wider border border-slate-100">UID: {user.id.toUpperCase()}</span>
+                    <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg uppercase tracking-wider border border-indigo-100">Role: {user.role}</span>
+                    <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-2.5 py-1 rounded-lg uppercase tracking-wider border border-slate-100">UID: {user.uid.toUpperCase()}</span>
+                    {user.isVerified && <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-lg uppercase tracking-wider border border-emerald-100">Verified</span>}
                   </div>
                 </div>
-                <button className="px-6 py-2.5 bg-slate-900 text-white text-xs font-black rounded-xl hover:bg-slate-800 transition-all uppercase tracking-widest">
-                  Edit Profile
-                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -234,6 +232,43 @@ const SettingsView: React.FC = () => {
                 <h1 className="text-2xl font-black text-slate-900 tracking-tight">Intelligence Engine</h1>
                 <p className="text-sm text-slate-500 font-medium">Control the heuristic parameters of the Zenith neural engine.</p>
               </header>
+
+              <Section label="Neural Configuration">
+                <SelectOption 
+                  label="Summary Style"
+                  value={user.aiPreferences.summaryStyle}
+                  onChange={(val) => updateAiPreferences({ summaryStyle: val as any })}
+                  options={[
+                    { label: 'Simple', value: 'simple' },
+                    { label: 'Detailed', value: 'detailed' },
+                    { label: 'Bullet', value: 'bullet' }
+                  ]}
+                />
+                <SelectOption 
+                  label="Language Level"
+                  value={user.aiPreferences.languageLevel}
+                  onChange={(val) => updateAiPreferences({ languageLevel: val as any })}
+                  options={[
+                    { label: 'Basic', value: 'basic' },
+                    { label: 'Intermediate', value: 'intermediate' },
+                    { label: 'Advanced', value: 'advanced' }
+                  ]}
+                />
+                <ToggleItem 
+                  icon={<Zap size={18} className="text-emerald-500" />}
+                  label="ML Predictions"
+                  description="Enable predictive risk and complexity scoring."
+                  active={user.aiPreferences.enableMLPrediction}
+                  onToggle={() => updateAiPreferences({ enableMLPrediction: !user.aiPreferences.enableMLPrediction })}
+                />
+                <ToggleItem 
+                  icon={<Sparkles size={18} className="text-indigo-500" />}
+                  label="Auto-Summarization"
+                  description="Automatically generate AI summaries for new tasks."
+                  active={user.aiPreferences.autoGenerateSummary}
+                  onToggle={() => updateAiPreferences({ autoGenerateSummary: !user.aiPreferences.autoGenerateSummary })}
+                />
+              </Section>
 
               <Section label="Core Suggestions">
                 <ToggleItem 

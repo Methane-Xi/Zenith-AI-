@@ -1,34 +1,58 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
+import { initializeApp, getApp, getApps, FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
+import { getFirestore, Firestore } from "firebase/firestore";
+import { getAnalytics, Analytics } from "firebase/analytics";
 
 /**
- * Zenith AI - Firebase Global Configuration
+ * ZENITH PRODUCTION FIREBASE SERVICE
+ * Validates environment before initialization to prevent blank screens.
  */
-const firebaseConfig = {
-  apiKey: "AIzaSyCEoiFB1xvpCMnfrr0SNY-G_uAkTsmpXX8",
-  authDomain: "zenith-ai-dd404.firebaseapp.com",
-  databaseURL: "https://zenith-ai-dd404-default-rtdb.firebaseio.com",
-  projectId: "zenith-ai-dd404",
-  storageBucket: "zenith-ai-dd404.firebasestorage.app",
-  messagingSenderId: "843024782224",
-  appId: "1:843024782224:web:3b9f717ea9241c851a1915",
-  measurementId: "G-KBG9G8VNDW"
+
+const getEnvVar = (name: string): string => {
+  const value = import.meta.env[name];
+  if (!value) {
+    console.warn(`Environment variable ${name} is missing. System may degrade.`);
+    return "";
+  }
+  return value;
 };
 
-// Initialize Firebase Core
-const app = initializeApp(firebaseConfig);
+const firebaseConfig = {
+  apiKey: getEnvVar("VITE_FIREBASE_API_KEY"),
+  authDomain: getEnvVar("VITE_FIREBASE_AUTH_DOMAIN"),
+  projectId: getEnvVar("VITE_FIREBASE_PROJECT_ID"),
+  storageBucket: getEnvVar("VITE_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId: getEnvVar("VITE_FIREBASE_MESSAGING_SENDER_ID"),
+  appId: getEnvVar("VITE_FIREBASE_APP_ID"),
+  measurementId: getEnvVar("VITE_FIREBASE_MEASUREMENT_ID")
+};
 
-// Initialize Services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+// Validate critical keys
+const isConfigValid = firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId;
 
-// Configure Provider
+let app: FirebaseApp;
+
+if (isConfigValid) {
+  try {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  } catch (error) {
+    console.error("Firebase Handshake Failure:", error);
+    throw new Error("FIREBASE_INIT_FAILED");
+  }
+} else {
+  console.error("CRITICAL: Firebase configuration is incomplete. Check .env file.");
+  // We don't throw here to allow the app to show a custom error boundary if needed, 
+  // but we must handle the 'app' being undefined in services.
+  app = {} as FirebaseApp; 
+}
+
+export const auth: Auth = isConfigValid ? getAuth(app) : {} as Auth;
+export const db: Firestore = isConfigValid ? getFirestore(app) : {} as Firestore;
+export const analytics: Analytics | null = isConfigValid && typeof window !== 'undefined' && firebaseConfig.measurementId 
+  ? getAnalytics(app) 
+  : null;
+
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// ARCHITECTURE GOVERNANCE: Force account selection (fixes sticky login issues)
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
+export default app;

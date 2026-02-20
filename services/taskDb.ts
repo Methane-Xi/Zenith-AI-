@@ -9,13 +9,14 @@ import {
   onSnapshot 
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Task } from '../types';
+import { Task, User } from '../types';
 
 export const taskDb = {
   /**
    * Subscribe to real-time task updates for a user
    */
   subscribeToTasks(userId: string, callback: (tasks: Task[]) => void) {
+    if (!db.type) return () => {}; // Guard for uninitialized db
     const q = query(collection(db, "tasks"), where("userId", "==", userId));
     return onSnapshot(q, (querySnapshot) => {
       const tasks: Task[] = [];
@@ -24,6 +25,8 @@ export const taskDb = {
       });
       // Sort locally by creation date
       callback(tasks.sort((a, b) => b.createdAt - a.createdAt));
+    }, (error) => {
+      console.error("Firestore Task Subscription Error:", error);
     });
   },
 
@@ -38,5 +41,10 @@ export const taskDb = {
 
   async deleteTask(taskId: string) {
     await deleteDoc(doc(db, "tasks", taskId));
+  },
+
+  async updateUser(userId: string, updates: Partial<User>) {
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, updates);
   }
 };

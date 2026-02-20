@@ -1,33 +1,53 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { Task } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { Task, TaskPriority, AIPreferences } from "../types";
 
 /**
- * SMART EXTRACTION
- * Parses a natural language string into structured task data.
+ * ZENITH NEURAL CORE - PRODUCTION GRADE
+ * Using @google/genai with strict environment handling.
+ */
+
+const getAI = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn("GEMINI_API_KEY missing. AI features will be disabled.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+/**
+ * SMART EXTRACTION & ML PREDICTION
  */
 export const extractTaskDetails = async (input: string) => {
+  const ai = getAI();
+  if (!ai) return null;
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Extract task information from this text: "${input}". 
-      If no duration is specified, estimate based on the task type.
-      If no priority is clear, assign one between 0.0 (low) and 1.0 (high).
-      Return JSON.`,
+      contents: [{ parts: [{ text: `Extract task information and predict ML attributes from this text: "${input}". 
+      Return JSON.` }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             title: { type: Type.STRING },
-            duration: { type: Type.STRING, description: "e.g. '30m', '2h', '1d'" },
+            duration: { type: Type.STRING },
             priority: { type: Type.NUMBER },
             category: { type: Type.STRING },
-            description: { type: Type.STRING }
+            description: { type: Type.STRING },
+            mlPrediction: {
+              type: Type.OBJECT,
+              properties: {
+                predictedCompletionTime: { type: Type.STRING },
+                riskScore: { type: Type.NUMBER },
+                suggestedPriority: { type: Type.STRING, enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+                autoCategory: { type: Type.STRING }
+              },
+              required: ["predictedCompletionTime", "riskScore", "suggestedPriority", "autoCategory"]
+            }
           },
-          required: ["title", "duration", "priority"]
+          required: ["title", "duration", "priority", "mlPrediction"]
         }
       }
     });
@@ -39,16 +59,78 @@ export const extractTaskDetails = async (input: string) => {
 };
 
 /**
- * TASK SUGGESTIONS
- * Generates contextual attributes for a new task using Gemini.
+ * ADVANCED TASK SUMMARIZATION
  */
-export const getTaskSuggestions = async (title: string) => {
+export const generateTaskSummaries = async (task: Task, prefs: AIPreferences) => {
+  const ai = getAI();
+  if (!ai) return null;
+  
+  const prompt = `Generate task summaries for: "${task.title}". 
+  Context: ${task.description || "No description"}.
+  User Preference: Style=${prefs.summaryStyle}, Level=${prefs.languageLevel}.
+  
+  Requirements:
+  1. Standard Summary: Professional and concise.
+  2. Simplified Summary: Extremely simple language for low-literacy users.
+  3. Bullet Summary: Structured key points.
+  4. Readability Score: 0-100.
+  
+  Return JSON.`;
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Analyze the following task and suggest smart attributes: "${title}".
-      Suggest attributes like duration (e.g., '1h'), category (e.g., 'Work'), priority (0.0 to 1.0), deadline (ISO date), or subtasks.
-      Return a JSON array of suggestions.`,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            standardSummary: { type: Type.STRING },
+            simplifiedSummary: { type: Type.STRING },
+            bulletSummary: { type: Type.ARRAY, items: { type: Type.STRING } },
+            readabilityScore: { type: Type.NUMBER }
+          },
+          required: ["standardSummary", "simplifiedSummary", "bulletSummary", "readabilityScore"]
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (e) {
+    console.error("Summarization_Error", e);
+    return null;
+  }
+};
+
+/**
+ * ANTIGRAVITY TERMINAL QUERY
+ */
+export const queryAntigravity = async (query: string, history: { role: 'user' | 'model', parts: { text: string }[] }[]) => {
+  const ai = getAI();
+  if (!ai) return "ERR: NEURAL_CORE_OFFLINE";
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: [...history, { role: 'user', parts: [{ text: query }] }],
+      config: {
+        systemInstruction: "You are ANTIGRAVITY, an elite AI systems architect. Tone: cold, precise, technical. Use monospace for code. You are embedded in the Zenith Enclave.",
+        temperature: 0.3,
+      }
+    });
+    return response.text;
+  } catch (e) {
+    console.error("Antigravity_Error", e);
+    return "ERR: NEURAL_LINK_FAULT. Check API status.";
+  }
+};
+
+export const getTaskSuggestions = async (title: string) => {
+  const ai = getAI();
+  if (!ai) return [];
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: `Analyze: "${title}". Suggest smart attributes. Return JSON array.` }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -56,10 +138,10 @@ export const getTaskSuggestions = async (title: string) => {
           items: {
             type: Type.OBJECT,
             properties: {
-              field: { type: Type.STRING, description: "One of: duration, category, priority, deadline, subtasks" },
+              field: { type: Type.STRING },
               value: { type: Type.STRING },
               reasoning: { type: Type.STRING },
-              metadata: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Required for 'subtasks' field" }
+              metadata: { type: Type.ARRAY, items: { type: Type.STRING } }
             },
             required: ["field", "value", "reasoning"]
           }
@@ -68,27 +150,17 @@ export const getTaskSuggestions = async (title: string) => {
     });
     return JSON.parse(response.text || "[]");
   } catch (e) {
-    console.error("Suggestions_Error", e);
     return [];
   }
 };
 
-/**
- * DECOMPOSE PROJECT
- * Breaks a high-level goal into a structured roadmap of tasks.
- */
 export const decomposeProject = async (goal: string) => {
+  const ai = getAI();
+  if (!ai) return [];
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Plan this project/goal: "${goal}". 
-      Return a JSON array of task objects. Each object must have:
-      - title (string)
-      - category (string)
-      - priority (float 0-1)
-      - estimatedDuration (string)
-      - reasoning (brief explanation)
-      - subtasks (array of strings)`,
+      contents: [{ parts: [{ text: `Plan project: "${goal}". Return JSON array.` }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -110,54 +182,41 @@ export const decomposeProject = async (goal: string) => {
     });
     return JSON.parse(response.text || "[]");
   } catch (e) {
-    console.error("Decomposition_Error", e);
     return [];
   }
 };
 
-/**
- * STRATEGIC BRIEFING
- * Analyzes entire task list to provide a tactical summary.
- */
 export const generateStrategicBriefing = async (tasks: Task[]) => {
-  const context = tasks.map(t => `- ${t.title} (Status: ${t.status}, Priority: ${t.priority})`).join("\n");
+  const ai = getAI();
+  if (!ai) return "Strategic synchronization offline.";
+  const context = tasks.map(t => `- ${t.title} (Status: ${t.status})`).join("\n");
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `System: You are Zenith, a tactical productivity strategist. 
-      Analyze the current workload and provide a sharp, 3-sentence morning briefing.
-      Highlight the biggest bottleneck and the highest-leverage win.
-      Current Workload:\n${context}`,
+      contents: [{ parts: [{ text: `Analyze and provide a 3-sentence tactical briefing.\n${context}` }] }],
     });
     return response.text;
   } catch (e) {
-    return "Strategic synchronization in progress. Focus on your highest priority task.";
+    return "Strategic synchronization in progress.";
   }
 };
 
-/**
- * SEARCH GROUNDED RESEARCH
- * Uses Google Search to find real-world info for a task.
- */
 export const performTaskResearch = async (taskTitle: string) => {
+  const ai = getAI();
+  if (!ai) return { text: "Research module offline.", links: [] };
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Research this task for me and provide actionable links and data: "${taskTitle}"`,
-      config: {
-        tools: [{ googleSearch: {} }]
-      }
+      contents: [{ parts: [{ text: `Research and provide actionable info for: "${taskTitle}"` }] }],
+      config: { tools: [{ googleSearch: {} }] }
     });
-    
     const text = response.text;
     const links = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => ({
       title: chunk.web?.title || "Reference",
       uri: chunk.web?.uri || "#"
     })) || [];
-
     return { text, links };
   } catch (e) {
-    console.error("Research_Error", e);
-    return { text: "Research module currently offline.", links: [] };
+    return { text: "Research module offline.", links: [] };
   }
 };

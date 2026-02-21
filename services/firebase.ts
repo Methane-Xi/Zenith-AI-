@@ -1,17 +1,24 @@
 import { initializeApp, getApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { 
+  getFirestore, 
+  Firestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getAnalytics, Analytics } from "firebase/analytics";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 /**
  * ZENITH PRODUCTION FIREBASE SERVICE
- * Validates environment before initialization to prevent blank screens.
+ * Validates environment and initializes security layers with offline support.
  */
 
 const getEnvVar = (name: string): string => {
   const value = import.meta.env[name];
   if (!value) {
-    console.warn(`Environment variable ${name} is missing. System may degrade.`);
+    console.warn(`Environment variable ${name} is missing.`);
     return "";
   }
   return value;
@@ -27,27 +34,45 @@ const firebaseConfig = {
   measurementId: getEnvVar("VITE_FIREBASE_MEASUREMENT_ID")
 };
 
-// Validate critical keys
 const isConfigValid = firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId;
 
 let app: FirebaseApp;
+let db: Firestore;
 
 if (isConfigValid) {
   try {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    
+    // Initialize Firestore with persistent cache for offline support
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    });
+
+    // Initialize App Check for deployment
+    if (typeof window !== 'undefined') {
+      if (import.meta.env.DEV || window.location.hostname.includes('run.app')) {
+        (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = '007E9A6E-9314-4087-A470-3A113D300AFC';
+      }
+      
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(getEnvVar("VITE_RECAPTCHA_SITE_KEY") || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'),
+        isTokenAutoRefreshEnabled: true
+      });
+    }
   } catch (error) {
-    console.error("Firebase Handshake Failure:", error);
+    console.error("Firebase Handshake Failure");
     throw new Error("FIREBASE_INIT_FAILED");
   }
 } else {
-  console.error("CRITICAL: Firebase configuration is incomplete. Check .env file.");
-  // We don't throw here to allow the app to show a custom error boundary if needed, 
-  // but we must handle the 'app' being undefined in services.
-  app = {} as FirebaseApp; 
+  console.error("CRITICAL: Firebase configuration is incomplete.");
+  app = {} as FirebaseApp;
+  db = {} as Firestore;
 }
 
 export const auth: Auth = isConfigValid ? getAuth(app) : {} as Auth;
-export const db: Firestore = isConfigValid ? getFirestore(app) : {} as Firestore;
+export { db };
 export const analytics: Analytics | null = isConfigValid && typeof window !== 'undefined' && firebaseConfig.measurementId 
   ? getAnalytics(app) 
   : null;

@@ -115,8 +115,10 @@ const AuthScreen: React.FC = () => {
   };
 
   const handleAuthError = (err: any) => {
-    const msg = err.message || "Authentication protocol failed. Check signals.";
-    setError({ message: msg, code: err.code });
+    // Safely extract message and code to avoid circular structure issues
+    const msg = typeof err === 'string' ? err : (err.message || "Authentication protocol failed. Check signals.");
+    const code = err.code || 'UNKNOWN_ERROR';
+    setError({ message: msg, code });
   };
 
   const resetMethod = () => {

@@ -10,7 +10,7 @@ import SettingsView from './components/SettingsView';
 import DashboardBriefing from './components/DashboardBriefing';
 import TaskModal from './components/TaskModal';
 import { TaskProvider, useTaskStore } from './store';
-import { TaskStatus, TaskPriority } from './types';
+import { TaskStatus, TaskPriority, User } from './types';
 import { Layers, Zap, Sparkles, ShieldAlert } from 'lucide-react';
 
 /**
@@ -90,15 +90,125 @@ const DashboardContent: React.FC = () => {
   );
 };
 
-const AdminPanel: React.FC = () => (
-  <div className="flex-1 p-8 flex flex-col items-center justify-center text-center space-y-4">
-    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center text-red-500">
-      <ShieldAlert size={40} />
+const AdminPanel: React.FC = () => {
+  const [stats, setStats] = React.useState<any>(null);
+  const [users, setUsers] = React.useState<User[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const { user: currentUser } = useTaskStore();
+
+  const loadAdminData = async () => {
+    try {
+      setLoading(true);
+      const { adminService } = await import('./services/adminService');
+      const [systemStats, allUsers] = await Promise.all([
+        adminService.getSystemStats(),
+        adminService.getAllUsers()
+      ]);
+      setStats(systemStats);
+      setUsers(allUsers);
+    } catch (error) {
+      console.error("Admin Access Denied or Sync Failure:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadAdminData();
+  }, []);
+
+  const handleRoleToggle = async (userId: string, currentRole: string) => {
+    if (userId === currentUser?.uid) return; // Prevent self-demotion
+    const { adminService } = await import('./services/adminService');
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    await adminService.updateUserRole(userId, newRole);
+    loadAdminData(); // Refresh
+  };
+
+  if (loading) return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin" />
     </div>
-    <h2 className="text-2xl font-black text-white uppercase tracking-widest">Admin Enclave</h2>
-    <p className="text-slate-400 max-w-md">Access restricted. System-wide telemetry and operator governance modules are initializing.</p>
-  </div>
-);
+  );
+
+  return (
+    <div className="flex-1 p-8 overflow-y-auto custom-scrollbar space-y-8">
+      <header className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white uppercase tracking-widest">Governance Enclave</h2>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-tighter">System-wide operator governance and telemetry</p>
+        </div>
+        <button onClick={loadAdminData} className="p-2 bg-white/5 rounded-xl text-slate-400 hover:text-white transition-colors">
+          <Zap size={20} />
+        </button>
+      </header>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <MetricCard label="Total Operators" value={stats?.totalUsers || 0} icon={<ShieldAlert size={14} />} color="text-red-400" />
+        <MetricCard label="Active Tasks" value={stats?.totalTasks || 0} icon={<Layers size={14} />} color="text-indigo-400" />
+        <div className="glass p-5 rounded-[2rem] flex flex-col justify-between h-32">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">System Integrity</span>
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xl font-black text-emerald-400">{stats?.systemHealth}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* User Management */}
+      <section className="space-y-4">
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2">Operator Directory</h3>
+        <div className="glass rounded-[2.5rem] overflow-hidden border border-white/5">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white/5 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <th className="px-6 py-4">Operator</th>
+                <th className="px-6 py-4">Role</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {users.map(u => (
+                <tr key={u.uid} className="hover:bg-white/5 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-3">
+                      <img src={u.photoURL} alt="" className="w-8 h-8 rounded-lg bg-white/5" />
+                      <div>
+                        <p className="text-xs font-bold text-white">{u.displayName}</p>
+                        <p className="text-[10px] text-slate-500">{u.email || u.phoneNumber}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${u.role === 'admin' ? 'bg-red-500/10 text-red-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${u.isVerified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-500'}`}>
+                      {u.isVerified ? 'Verified' : 'Unlinked'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => handleRoleToggle(u.uid, u.role)}
+                      disabled={u.uid === currentUser?.uid}
+                      className="text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-widest disabled:opacity-20"
+                    >
+                      Toggle Role
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+};
 
 const AppInternal: React.FC = () => {
   const { user, activePanel, isLoading } = useTaskStore();

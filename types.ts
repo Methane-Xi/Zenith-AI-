@@ -35,8 +35,9 @@ export interface BiometricTelemetry {
 }
 
 export interface MLProfile {
-  averageCompletionTime: number;
-  commonCategories: string[];
+  completionRate: number;
+  averageDuration: number;
+  delayFrequency: number;
   productivityScore: number;
   riskPattern: 'stable' | 'volatile' | 'improving';
 }
@@ -46,6 +47,7 @@ export interface AIPreferences {
   languageLevel: 'basic' | 'intermediate' | 'advanced';
   enableMLPrediction: boolean;
   autoGenerateSummary: boolean;
+  aiAggressiveness: number;
 }
 
 export interface User {
@@ -60,12 +62,14 @@ export interface User {
   isVerified: boolean;
   aiPreferences: AIPreferences;
   mlProfile: MLProfile;
+  settings: UserSettings;
   usageStats: {
     totalTasksCreated: number;
     totalTasksCompleted: number;
     totalAIRequests: number;
   };
   biometricConfidence: number;
+  status: 'active' | 'disabled';
 }
 
 export interface AISummary {
@@ -111,6 +115,8 @@ export interface Reminder {
   message: string;
 }
 
+export type TimerStatus = 'idle' | 'running' | 'paused' | 'completed';
+
 export interface Task {
   id: string;
   userId: string;
@@ -129,20 +135,45 @@ export interface Task {
   updatedAt: number;
   category?: string;
   duration?: string;
+  durationInSeconds?: number;
+  remainingSeconds?: number;
+  timerStatus?: TimerStatus;
   deadline?: string;
   energyLevel?: number;
   tags: string[];
   isArchived: boolean;
+  reminderTime?: number;
+  reminderStatus?: 'pending' | 'expired' | 'dismissed';
+  reminderHistory?: number[];
+  autoCarryForward?: boolean;
+  notificationSent?: boolean;
+}
+
+export interface SystemStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalTasks: number;
+  expiredReminders: number;
+  completedTasks: number;
+  aiRequestsToday: number;
+  systemErrors: number;
+  systemHealth: string;
 }
 
 export type ActivePanel = 'dashboard' | 'calendar' | 'notifications' | 'settings' | 'admin';
 
 export interface UserSettings {
+  theme: 'light' | 'dark' | 'system';
+  aiSummaryMode: 'standard' | 'simple' | 'bullet';
+  aiAggressiveness: number;
+  voiceEnabled: boolean;
+  autoCarryForward: boolean;
+  notificationsEnabled: boolean;
+  mlEnabled: boolean;
   aiAssistance: boolean;
   aiReasoningVisible: boolean;
   aiFrequency: 'realtime' | 'daily' | 'never';
   aiTone: 'friendly' | 'professional' | 'minimal';
-  notifications: boolean;
   reminderType: 'push' | 'email' | 'sms' | 'app';
   reminderSound: string;
   notificationStyle: 'banner' | 'modal' | 'toast';
@@ -152,9 +183,10 @@ export interface UserSettings {
   autoPriority: boolean;
   defaultCategory: string;
   richTextEnabled: boolean;
-  theme: 'light' | 'dark' | 'system';
   layoutDensity: 'compact' | 'spacious';
   showUpcomingWidget: boolean;
   showAiWidget: boolean;
   biometricEnforcement: 'low' | 'high' | 'paranoid';
+  autoRescheduleEnabled: boolean;
+  crossDeviceSyncEnabled: boolean;
 }

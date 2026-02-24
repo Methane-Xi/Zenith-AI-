@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import TaskInput from './components/TaskInput';
 import TaskCard from './components/TaskCard';
@@ -8,7 +9,6 @@ import CalendarView from './components/CalendarView';
 import NotificationsView from './components/NotificationsView';
 import SettingsView from './components/SettingsView';
 import DashboardBriefing from './components/DashboardBriefing';
-import TaskModal from './components/TaskModal';
 import { TaskProvider, useTaskStore } from './store';
 import { TaskStatus, TaskPriority, User } from './types';
 import { Layers, Zap, Sparkles, ShieldAlert } from 'lucide-react';
@@ -27,14 +27,19 @@ const MetricCard = ({ label, value, icon, color }: { label: string, value: numbe
 );
 
 const DashboardContent: React.FC = () => {
-  const { tasks } = useTaskStore();
+  const { tasks, searchQuery } = useTaskStore();
 
   const groupedTasks = useMemo(() => {
+    const filtered = tasks.filter(t => 
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      t.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return {
-      active: tasks.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.ARCHIVED),
-      completed: tasks.filter(t => t.status === TaskStatus.COMPLETED),
+      active: filtered.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.ARCHIVED),
+      completed: filtered.filter(t => t.status === TaskStatus.COMPLETED),
     };
-  }, [tasks]);
+  }, [tasks, searchQuery]);
 
   const stats = useMemo(() => {
     const total = tasks.length;
@@ -99,7 +104,7 @@ const AdminPanel: React.FC = () => {
   const loadAdminData = async () => {
     try {
       setLoading(true);
-      const { adminService } = await import('./services/adminService');
+      const { adminService } = await import('./services/admin/adminService');
       const [systemStats, allUsers] = await Promise.all([
         adminService.getSystemStats(),
         adminService.getAllUsers()
@@ -119,7 +124,7 @@ const AdminPanel: React.FC = () => {
 
   const handleRoleToggle = async (userId: string, currentRole: string) => {
     if (userId === currentUser?.uid) return; // Prevent self-demotion
-    const { adminService } = await import('./services/adminService');
+    const { adminService } = await import('./services/admin/adminService');
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     await adminService.updateUserRole(userId, newRole);
     loadAdminData(); // Refresh
@@ -211,7 +216,7 @@ const AdminPanel: React.FC = () => {
 };
 
 const AppInternal: React.FC = () => {
-  const { user, activePanel, isLoading } = useTaskStore();
+  const { user, isLoading } = useTaskStore();
 
   if (isLoading) {
     return (
@@ -228,19 +233,24 @@ const AppInternal: React.FC = () => {
 
   return (
     <Layout>
-      {activePanel === 'dashboard' && <DashboardContent />}
-      {activePanel === 'calendar' && <CalendarView />}
-      {activePanel === 'notifications' && <NotificationsView />}
-      {activePanel === 'settings' && <SettingsView />}
-      {activePanel === 'admin' && <AdminPanel />}
-      <TaskModal />
+      <Routes>
+        <Route path="/" element={<DashboardContent />} />
+        <Route path="/calendar" element={<CalendarView />} />
+        <Route path="/notifications" element={<NotificationsView />} />
+        <Route path="/settings" element={<SettingsView />} />
+        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/task/:id" element={<DetailPanel isPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Layout>
   );
 };
 
 const App: React.FC = () => (
   <TaskProvider>
-    <AppInternal />
+    <Router>
+      <AppInternal />
+    </Router>
   </TaskProvider>
 );
 

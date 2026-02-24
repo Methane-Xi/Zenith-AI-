@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from './services/firebase';
 import { Task, TaskStatus, TaskPriority, AISuggestion, User, ActivePanel, UserSettings, AIPreferences } from './types';
 import { 
   getTaskSuggestions, 
@@ -7,15 +9,12 @@ import {
   performTaskResearch, 
   extractTaskDetails,
   generateTaskSummaries,
-  queryAntigravity
 } from './services/geminiService';
 import { authService } from './services/authService';
 import { taskDb } from './services/taskDb';
-
-interface TerminalEntry {
-  role: 'user' | 'model';
-  parts: { text: string }[];
-}
+import { settingsService } from './services/settings/settingsService';
+import { mlService } from './services/ml/mlService';
+import { reminderService } from './services/reminder/reminderService';
 
 interface TaskContextType {
   user: User | null;
@@ -42,10 +41,8 @@ interface TaskContextType {
   setSelectedTaskId: (id: string | null) => void;
   isTaskModalOpen: boolean;
   setIsTaskModalOpen: (open: boolean) => void;
-  isTerminalOpen: boolean;
-  setIsTerminalOpen: (open: boolean) => void;
-  terminalHistory: TerminalEntry[];
-  sendTerminalQuery: (q: string) => Promise<void>;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
   settings: UserSettings;
   updateSettings: (updates: Partial<UserSettings>) => void;
   updateAiPreferences: (updates: Partial<AIPreferences>) => void;
@@ -53,25 +50,32 @@ interface TaskContextType {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
+  theme: 'dark',
+  aiSummaryMode: 'standard',
+  aiAggressiveness: 3,
+  voiceEnabled: false,
+  autoCarryForward: true,
+  notificationsEnabled: true,
+  mlEnabled: true,
   aiAssistance: true,
   aiReasoningVisible: true,
   aiFrequency: 'realtime',
   aiTone: 'professional',
-  notifications: true,
-  reminderType: 'push',
-  reminderSound: 'zenith-pulse',
-  notificationStyle: 'banner',
+  reminderType: 'app',
+  reminderSound: 'default',
+  notificationStyle: 'toast',
   snoozeDuration: 10,
   aiSuggestedReminders: true,
-  defaultDuration: '1h',
+  defaultDuration: '30m',
   autoPriority: true,
   defaultCategory: 'General',
   richTextEnabled: true,
-  theme: 'dark',
-  layoutDensity: 'spacious',
+  layoutDensity: 'compact',
   showUpcomingWidget: true,
   showAiWidget: true,
-  biometricEnforcement: 'high'
+  biometricEnforcement: 'low',
+  autoRescheduleEnabled: false,
+  crossDeviceSyncEnabled: true,
 };
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -85,26 +89,53 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activePanel, setActivePanel] = useState<ActivePanel>('dashboard');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
-  const [terminalHistory, setTerminalHistory] = useState<TerminalEntry[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
   useEffect(() => {
     const unsubscribe = authService.onAuthChange((u) => {
-      setUser(u);
+      if (!u) {
+        setUser(null);
+      } else {
+        setUser(u as User);
+      }
+      // Always resolve loading state once auth status is determined
       setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (user) {
-      const unsubscribe = taskDb.subscribeToTasks(user.uid, (syncedTasks) => {
+    if (user?.uid) {
+      // Real-time user profile listener - non-blocking
+      const userRef = doc(db, "users", user.uid);
+      const unsubscribeUser = onSnapshot(userRef, (doc) => {
+        if (doc.exists()) {
+          setUser(doc.data() as User);
+        }
+      }, (error) => {
+        console.error("User Profile Sync Error:", error);
+      });
+
+      const unsubscribeTasks = taskDb.subscribeToTasks(user.uid, (syncedTasks) => {
         setTasks(syncedTasks);
       });
-      return () => unsubscribe();
+      
+      const unsubscribeSettings = settingsService.subscribeToSettings(user.uid, (syncedSettings: UserSettings) => {
+        setSettings(syncedSettings);
+        settingsService.applyTheme(syncedSettings.theme);
+      });
+
+      // Scan reminders on start
+      reminderService.scanAndProcessReminders(user.uid);
+
+      return () => {
+        unsubscribeUser();
+        unsubscribeTasks();
+        unsubscribeSettings();
+      };
     }
-  }, [user]);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (user && tasks.length > 0) {
@@ -120,60 +151,69 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return '';
     const newId = Math.random().toString(36).substr(2, 9);
     
-    let extracted = await extractTaskDetails(title);
-    
+    // Create basic task immediately for instant UI response
     const newTask: Task = {
       id: newId,
       userId: user.uid,
-      title: extracted?.title || title,
-      description: details?.description || extracted?.description || '',
+      title: title,
+      description: details?.description || '',
       status: TaskStatus.TODO,
-      priority: details?.priority ?? extracted?.priority ?? 0.5,
-      priorityLevel: extracted?.mlPrediction?.suggestedPriority || TaskPriority.MEDIUM,
+      priority: details?.priority ?? 0.5,
+      priorityLevel: TaskPriority.MEDIUM,
       subtasks: details?.subtasks || [],
       notes: [],
       reminders: [],
       suggestions: [],
-      mlPrediction: extracted?.mlPrediction,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      category: details?.category || extracted?.category || settings.defaultCategory,
-      duration: details?.duration || extracted?.duration || settings.defaultDuration,
+      category: details?.category || settings.defaultCategory,
+      duration: details?.duration || settings.defaultDuration,
       tags: details?.tags || [],
       isArchived: false
     };
 
-    // Generate AI summaries if enabled
-    if (user.aiPreferences.autoGenerateSummary) {
-      const summaries = await generateTaskSummaries(newTask, user.aiPreferences);
-      if (summaries) newTask.aiSummary = summaries;
-    }
-
     await taskDb.saveTask(newTask);
 
-    if (settings.aiAssistance) {
-      getTaskSuggestions(newTask.title).then(async (suggestions) => {
-        const aiSuggestions: AISuggestion[] = suggestions.map((s: any) => ({
-          id: Math.random().toString(36).substr(2, 9),
-          field: s.field as any,
-          value: s.value || '',
-          reasoning: s.reasoning || '',
-          status: 'pending',
-          metadata: s.metadata
-        }));
-        await taskDb.updateTask(newId, { suggestions: aiSuggestions });
-      });
-    }
+    // Perform AI enhancements in background
+    (async () => {
+      try {
+        const extracted = await extractTaskDetails(title);
+        const updates: Partial<Task> = {
+          title: extracted?.title || title,
+          description: details?.description || extracted?.description || '',
+          priority: details?.priority ?? extracted?.priority ?? 0.5,
+          priorityLevel: extracted?.mlPrediction?.suggestedPriority || TaskPriority.MEDIUM,
+          mlPrediction: extracted?.mlPrediction,
+          category: details?.category || extracted?.category || settings.defaultCategory,
+          duration: details?.duration || extracted?.duration || settings.defaultDuration,
+        };
+
+        if (user.aiPreferences.autoGenerateSummary) {
+          const summaries = await generateTaskSummaries({ ...newTask, ...updates }, user.aiPreferences);
+          if (summaries) updates.aiSummary = summaries;
+        }
+
+        await taskDb.updateTask(newId, updates);
+
+        if (settings.aiAssistance) {
+          const suggestions = await getTaskSuggestions(updates.title || title);
+          const aiSuggestions: AISuggestion[] = suggestions.map((s: any) => ({
+            id: Math.random().toString(36).substr(2, 9),
+            field: s.field as any,
+            value: s.value || '',
+            reasoning: s.reasoning || '',
+            status: 'pending',
+            metadata: s.metadata
+          }));
+          await taskDb.updateTask(newId, { suggestions: aiSuggestions });
+        }
+      } catch (error) {
+        console.error("AI Enhancement Error:", error);
+      }
+    })();
+
     return newId;
   }, [user, settings]);
-
-  const sendTerminalQuery = async (q: string) => {
-    const newUserEntry: TerminalEntry = { role: 'user', parts: [{ text: q }] };
-    setTerminalHistory(prev => [...prev, newUserEntry]);
-    const responseText = await queryAntigravity(q, terminalHistory);
-    const newModelEntry: TerminalEntry = { role: 'model', parts: [{ text: responseText || 'ERROR' }] };
-    setTerminalHistory(prev => [...prev, newModelEntry]);
-  };
 
   const explodeProject = async (goal: string) => {
     if (!user) return;
@@ -215,7 +255,13 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     await taskDb.updateTask(id, updates);
-  }, []);
+    
+    // ML Profile update on completion
+    if (user && updates.status === TaskStatus.COMPLETED) {
+      const task = tasks.find(t => t.id === id);
+      if (task) mlService.updateProfileOnTaskCompletion(user.uid, task);
+    }
+  }, [user, tasks]);
 
   const toggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -268,13 +314,35 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const verifyOtp = async (confirmation: any, code: string) => { await authService.verifyOtp(confirmation, code); };
   const logout = async () => authService.logout();
 
-  const updateSettings = (updates: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...updates }));
+  const updateSettings = async (updates: Partial<UserSettings>) => {
+    if (!user) return;
+    // Optimistic update
+    const previousSettings = { ...settings };
+    setSettings(prev => ({ ...prev, ...updates }));
+    if (updates.theme) settingsService.applyTheme(updates.theme);
+
+    try {
+      await settingsService.updateSettings(user.uid, updates);
+    } catch (error) {
+      console.error("Failed to sync settings:", error);
+      setSettings(previousSettings);
+      if (previousSettings.theme) settingsService.applyTheme(previousSettings.theme);
+    }
+  };
   
   const updateAiPreferences = async (updates: Partial<AIPreferences>) => {
     if (!user) return;
+    // Optimistic update
+    const previousPrefs = { ...user.aiPreferences };
     const newPrefs = { ...user.aiPreferences, ...updates };
-    await taskDb.updateUser(user.uid, { aiPreferences: newPrefs });
     setUser(prev => prev ? { ...prev, aiPreferences: newPrefs } : null);
+
+    try {
+      await taskDb.updateUser(user.uid, { aiPreferences: newPrefs });
+    } catch (error) {
+      console.error("Failed to sync AI preferences:", error);
+      setUser(prev => prev ? { ...prev, aiPreferences: previousPrefs } : null);
+    }
   };
 
   return React.createElement(TaskContext.Provider, { 
@@ -282,8 +350,9 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user, tasks, briefing, isBriefingLoading, isLoading, activePanel, setActivePanel, login, 
       signUpEmail, loginEmail, sendOtp, verifyOtp, logout, 
       addTask, explodeProject, deepResearch, updateTask, deleteTask, addNote, toggleSubtask, handleSuggestion, 
-      selectedTaskId, setSelectedTaskId, isTaskModalOpen, setIsTaskModalOpen, isTerminalOpen, setIsTerminalOpen,
-      terminalHistory, sendTerminalQuery, settings, updateSettings, updateAiPreferences
+      selectedTaskId, setSelectedTaskId, isTaskModalOpen, setIsTaskModalOpen,
+      searchQuery, setSearchQuery,
+      settings, updateSettings, updateAiPreferences
     } 
   }, children);
 };

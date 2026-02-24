@@ -1,19 +1,23 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTaskStore } from '../store';
 import { Sparkles, Command, BrainCircuit, Loader2, Plus } from 'lucide-react';
 
 const TaskInput: React.FC = () => {
   const [title, setTitle] = useState('');
   const [isExploding, setIsExploding] = useState(false);
-  const { addTask, explodeProject, setIsTaskModalOpen } = useTaskStore();
+  const { addTask, explodeProject } = useTaskStore();
+  const navigate = useNavigate();
 
   const isProjectCommand = title.toLowerCase().startsWith('plan ') || title.toLowerCase().startsWith('project ');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setIsTaskModalOpen(true);
+      // Create a blank draft and navigate
+      const newId = await addTask('New Tactical Objective');
+      if (newId) navigate(`/task/${newId}`);
       return;
     }
 
@@ -24,8 +28,9 @@ const TaskInput: React.FC = () => {
       setTitle('');
     } else {
       // Direct commit via AI extraction logic in store
-      await addTask(title.trim());
+      const newId = await addTask(title.trim());
       setTitle('');
+      if (newId) navigate(`/task/${newId}`);
     }
   };
 
@@ -47,7 +52,6 @@ const TaskInput: React.FC = () => {
             value={title}
             disabled={isExploding}
             onChange={(e) => setTitle(e.target.value)}
-            onFocus={() => {}} 
             placeholder={isExploding ? "AI is orchestrating roadmap..." : "Type 'Plan a launch' or click + for details..."}
             className={`w-full pl-12 pr-4 py-3.5 border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent rounded-2xl text-slate-800 placeholder-slate-400 font-medium transition-all shadow-sm ${
               isProjectCommand ? 'bg-purple-50' : 'bg-slate-100'
@@ -58,7 +62,10 @@ const TaskInput: React.FC = () => {
         <div className="flex items-center space-x-2">
           <button
             type="button"
-            onClick={() => setIsTaskModalOpen(true)}
+            onClick={async () => {
+              const newId = await addTask('New Tactical Objective');
+              if (newId) navigate(`/task/${newId}`);
+            }}
             className="p-3.5 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all border border-slate-200"
             title="Detailed Task Orchestration"
           >

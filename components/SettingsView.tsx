@@ -37,18 +37,18 @@ const Section = ({ label, children }: { label: string, children?: React.ReactNod
 );
 
 const ToggleItem = ({ icon, label, description, active, onToggle }: { icon: React.ReactNode, label: string, description: string, active: boolean, onToggle: () => void }) => (
-  <div onClick={onToggle} className="flex items-center justify-between p-5 bg-white rounded-3xl border border-slate-200 hover:border-indigo-200 transition-all cursor-pointer group">
-    <div className="flex items-center space-x-4">
-      <div className="p-2.5 bg-slate-50 rounded-xl group-hover:bg-white transition-colors">
+  <div onClick={onToggle} className="flex items-center justify-between p-4 bg-white rounded-3xl border border-slate-200 hover:border-indigo-200 transition-all cursor-pointer group">
+    <div className="flex items-center space-x-3">
+      <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-white transition-colors">
         {icon}
       </div>
       <div>
         <h3 className="text-sm font-bold text-slate-900">{label}</h3>
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">{description}</p>
+        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">{description}</p>
       </div>
     </div>
-    <div className={`w-12 h-6 rounded-full transition-all relative ${active ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${active ? 'left-7' : 'left-1'}`} />
+    <div className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${active ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
     </div>
   </div>
 );
@@ -198,8 +198,8 @@ const SettingsView: React.FC = () => {
                   icon={<Volume2 size={18} className="text-amber-500" />}
                   label="Master Notification Toggle"
                   description="Enable or disable all outgoing signals globally."
-                  active={settings.notifications}
-                  onToggle={() => updateSettings({ notifications: !settings.notifications })}
+                  active={settings.notificationsEnabled}
+                  onToggle={() => updateSettings({ notificationsEnabled: !settings.notificationsEnabled })}
                 />
               </Section>
 
@@ -415,20 +415,23 @@ const SettingsView: React.FC = () => {
                    icon={<Activity size={18} className="text-slate-600" />}
                    label="Auto-Reschedule Engine"
                    description="Allow AI to move low-priority tasks if current energy levels drop."
-                   active={false}
-                   onToggle={() => {}}
+                   active={settings.autoRescheduleEnabled}
+                   onToggle={() => updateSettings({ autoRescheduleEnabled: !settings.autoRescheduleEnabled })}
                 />
                 <ToggleItem 
                    icon={<Globe size={18} className="text-slate-600" />}
                    label="Cross-Device Neural Sync"
                    description="Real-time session state mirroring across all authorized hubs."
-                   active={true}
-                   onToggle={() => {}}
+                   active={settings.crossDeviceSyncEnabled}
+                   onToggle={() => updateSettings({ crossDeviceSyncEnabled: !settings.crossDeviceSyncEnabled })}
                 />
               </Section>
 
               <div className="pt-10 flex flex-col items-center">
-                 <button className="flex items-center space-x-2 text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.3em] transition-all">
+                 <button 
+                   onClick={() => window.location.reload()}
+                   className="flex items-center space-x-2 text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.3em] transition-all"
+                 >
                     <Database size={12} />
                     <span>Purge Local Cache & Re-Sync</span>
                  </button>
